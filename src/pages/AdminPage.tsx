@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, authLinkType } from '@/lib/supabase';
 import { fetchMenuData } from '@/lib/menuApi';
 import type { MenuCategory, MenuItem, MenuItemOption } from '@/lib/types';
 import {
@@ -26,15 +26,21 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginLoading, setLoginLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
+  const [mustSetPassword, setMustSetPassword] = useState(
+    authLinkType === 'invite' || authLinkType === 'recovery'
+  );
+  const [newPassword, setNewPassword] = useState('');
+  const [newPassword2, setNewPassword2] = useState('');
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(!!data.session);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, sess) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, sess) => {
       setSession(!!sess);
+      if (event === 'PASSWORD_RECOVERY') setMustSetPassword(true);
     });
 
     return () => listener.subscription.unsubscribe();
@@ -45,22 +51,60 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
     setLoginLoading(true);
     setLoginError(null);
 
-    if (isSignUp) {
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) {
-        setLoginError(error.message);
-        setLoginLoading(false);
-      }
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) {
-        setLoginError(error.message);
-        setLoginLoading(false);
-      }
+    setInfo(null);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) {
+      setLoginError(
+        error.message === 'Invalid login credentials'
+          ? 'E-Mail oder Passwort ist falsch.'
+          : error.message
+      );
+      setLoginLoading(false);
     }
+  };
+
+  const handleForgot = async () => {
+    setInfo(null);
+    if (!email) {
+      setLoginError('Bitte geben Sie oben Ihre E-Mail-Adresse ein.');
+      return;
+    }
+    setLoginError(null);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    if (error) {
+      setLoginError(error.message);
+    } else {
+      setInfo('Wir haben Ihnen eine E-Mail mit einem Link zum Zurücksetzen geschickt.');
+    }
+  };
+
+  const handleSetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    if (newPassword.length < 8) {
+      setLoginError('Das Passwort muss mindestens 8 Zeichen lang sein.');
+      return;
+    }
+    if (newPassword !== newPassword2) {
+      setLoginError('Die beiden Passwörter stimmen nicht überein.');
+      return;
+    }
+    setLoginLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setLoginLoading(false);
+    if (error) {
+      setLoginError(error.message);
+      return;
+    }
+    setNewPassword('');
+    setNewPassword2('');
+    setMustSetPassword(false);
   };
 
   const handleLogout = async () => {
@@ -75,6 +119,69 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
     );
   }
 
+  if (session && mustSetPassword) {
+    return (
+      <div className="bg-cream pt-28 min-h-screen flex items-center justify-center px-6">
+        <div className="bg-cream-light rounded-2xl shadow-lg border border-stone-200/50 p-8 md:p-10 max-w-md w-full">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-forest/10 mb-4">
+              <Lock className="w-6 h-6 text-forest" />
+            </div>
+            <h1 className="font-serif text-3xl text-forest">Passwort festlegen</h1>
+            <p className="text-stone-500 text-sm mt-2">
+              Willkommen! Bitte wählen Sie jetzt Ihr persönliches Passwort für den Admin-Bereich.
+            </p>
+          </div>
+
+          <form onSubmit={handleSetPassword} className="space-y-4">
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-stone-500 mb-1.5">
+                Neues Passwort (mindestens 8 Zeichen)
+              </label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                minLength={8}
+                autoComplete="new-password"
+                className="w-full px-4 py-3 rounded-lg border border-stone-300 bg-cream-light text-stone-700 focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-stone-500 mb-1.5">
+                Passwort wiederholen
+              </label>
+              <input
+                type="password"
+                value={newPassword2}
+                onChange={(e) => setNewPassword2(e.target.value)}
+                required
+                minLength={8}
+                autoComplete="new-password"
+                className="w-full px-4 py-3 rounded-lg border border-stone-300 bg-cream-light text-stone-700 focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest transition-all"
+              />
+            </div>
+
+            {loginError && (
+              <p className="text-terracotta-dark text-sm bg-terracotta/10 rounded-lg px-4 py-2.5">
+                {loginError}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="w-full bg-forest text-cream py-3 rounded-lg font-medium uppercase tracking-wider text-sm hover:bg-forest-light transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loginLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Passwort speichern'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   if (!session) {
     return (
       <div className="bg-cream pt-28 min-h-screen flex items-center justify-center px-6">
@@ -85,9 +192,7 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
             </div>
             <h1 className="font-serif text-3xl text-forest">Admin-Bereich</h1>
             <p className="text-stone-500 text-sm mt-2">
-              {isSignUp
-                ? 'Erstellen Sie ein Konto, um die Speisekarte zu bearbeiten.'
-                : 'Melden Sie sich an, um die Speisekarte zu bearbeiten.'}
+              Melden Sie sich an, um die Speisekarte zu bearbeiten.
             </p>
           </div>
 
@@ -124,6 +229,9 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
                 {loginError}
               </p>
             )}
+            {info && (
+              <p className="text-forest text-sm bg-forest/10 rounded-lg px-4 py-2.5">{info}</p>
+            )}
 
             <button
               type="submit"
@@ -132,8 +240,6 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
             >
               {loginLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
-              ) : isSignUp ? (
-                'Konto erstellen'
               ) : (
                 'Anmelden'
               )}
@@ -142,15 +248,11 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
 
           <div className="text-center mt-4">
             <button
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setLoginError(null);
-              }}
+              type="button"
+              onClick={handleForgot}
               className="text-stone-400 hover:text-forest text-sm transition-colors"
             >
-              {isSignUp
-                ? 'Bereits ein Konto? Anmelden'
-                : 'Noch kein Konto? Jetzt registrieren'}
+              Passwort vergessen?
             </button>
           </div>
 
