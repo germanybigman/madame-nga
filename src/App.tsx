@@ -8,9 +8,12 @@ import ContactPage from '@/pages/ContactPage';
 import ImpressumPage from '@/pages/ImpressumPage';
 import DatenschutzPage from '@/pages/DatenschutzPage';
 import AdminPage from '@/pages/AdminPage';
+import { authLinkType } from '@/lib/supabase';
 
 export default function App() {
-  const [page, setPage] = useState('home');
+  const [page, setPage] = useState(
+    authLinkType === 'invite' || authLinkType === 'recovery' ? 'admin' : 'home'
+  );
 
   const handleNavigate = (newPage: string) => {
     setPage(newPage);
