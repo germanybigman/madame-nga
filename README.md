@@ -1,30 +1,55 @@
 # Madame Nga – Vietnamese Cuisine
 
-Restaurant website for Madame Nga in Selb, featuring a Supabase-powered menu management system.
+Restaurant website for Madame Nga in Selb, featuring a Supabase-backed menu management system.
 
-## Tech Stack
+## Overview
 
-- React + TypeScript + Vite
-- Tailwind CSS
-- Supabase (database + auth)
-- Lucide React (icons)
+This repository contains a Vite + React + TypeScript single-page application with an admin area (Supabase auth) to manage menu categories, items and options.
 
-## Features
+## Quickstart (local development)
 
-- Home, Menu, About, Contact pages
-- Impressum & Datenschutz (German legal pages)
-- Admin panel with email/password login to manage menu items
-- Menu data stored in Supabase (categories, items, options)
-- Row Level Security: public read, authenticated write
+1. Install dependencies: `npm install`
+2. Copy `.env.example` to `.env` and set your Supabase credentials:
 
-## Setup
+   VITE_SUPABASE_URL=your-supabase-url
 
-1. Clone the repo
-2. `npm install`
-3. Copy `.env.example` to `.env` and fill in your Supabase credentials
-4. Run the migration in `supabase/migrations/` on your Supabase project
-5. `npm run dev`
+   VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 
-## Admin Access
+3. Run migrations in your Supabase project (see `supabase/migrations/`)
+4. (Optional) Seed with example data: `psql < supabase/seed.sql` or run the SQL in the Supabase SQL editor
+5. Start dev server: `npm run dev`
 
-Navigate to `/admin` (or click Admin in the footer) to log in and manage the menu.
+## Production build
+
+- Build: `npm run build`
+- Deploy to Vercel/Netlify/GitHub Pages (see Deployment section)
+
+## Supabase setup
+
+1. Create a new Supabase project.
+2. Run the migration SQL in `supabase/migrations/20261013163059_create_menu_tables.sql` to create the required tables.
+3. (Optional) Run `supabase/seed.sql` to insert starter menu data.
+4. Go to Project Settings → API to copy your `anon` key and URL and paste them into `.env`.
+5. Make sure Row Level Security (RLS) policies allow public reads for menu tables and authenticated writes for admin actions. The project was originally built with public read / authenticated write in mind.
+
+## Admin access
+
+- Visit `/admin` to sign in using email/password.
+- Use Supabase auth to manage users. When creating the restaurant account for the buyer, create one admin user and share credentials securely.
+
+## CI
+
+A GitHub Actions workflow has been added to run lint, typecheck and build on PRs and pushes to main.
+
+## Handoff checklist (recommended before sale)
+
+- [ ] Deploy to a production host (Vercel / Netlify)
+- [ ] Configure production Supabase project and seed data
+- [ ] Create admin user and provide secure credentials to the buyer
+- [ ] Add favicon and social image assets under `public/` or `static/`
+- [ ] Replace placeholder URLs in `index.html` and README with the real domain
+- [ ] Review legal pages (Impressum / Datenschutzerklärung) for accuracy
+
+## Contact
+
+For developer questions, contact: info@madame-nga.de
